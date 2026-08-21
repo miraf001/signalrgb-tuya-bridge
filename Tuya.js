@@ -18,6 +18,10 @@ export function Version() { return "0.2.0"; }
 export function Type() { return "network"; }
 export function ImageUrl() { return "https://assets.signalrgb.com/brands/tuya/logo.png"; }
 export function Size() { return [1, 1]; }
+// Each discovered Tuya light is a controller with its own SignalRGB device.
+// This is the model used by WLED/Govee and prevents SignalRGB from inserting
+// an empty built-in "Default Strip - 0" component.
+export function SubdeviceController() { return true; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 1.0; }
 
@@ -60,9 +64,10 @@ class TuyaBridge {
 
 export function Initialize() {
     device.setName(controller.name);
+    device.SetLedLimit(1);
     device.addChannel("Tuya Light", 1);
     socket = udp.createSocket();
-    device.log("[Tuya] Initialized local UDP bridge");
+    device.log("[Tuya] Initialized controller with 1 LED on local UDP bridge");
 }
 
 export function Render() {
