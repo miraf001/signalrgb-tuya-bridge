@@ -14,17 +14,21 @@ const MIN_DELTA = 3;
 
 export function Name() { return "Tuya Light Bridge"; }
 export function Publisher() { return "miraf001"; }
-export function Version() { return "0.2.0"; }
+export function Version() { return "0.3.0"; }
 export function Type() { return "network"; }
 export function ImageUrl() { return "https://assets.signalrgb.com/brands/tuya/logo.png"; }
 export function Size() { return [1, 1]; }
-// Each discovered Tuya light is a controller with its own SignalRGB device.
-// This is the model used by WLED/Govee and prevents SignalRGB from inserting
-// an empty built-in "Default Strip - 0" component.
-export function SubdeviceController() { return true; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 1.0; }
 export function DefaultComponentBrand() { return "Tuya"; }
+
+// This is a complete one-pixel device, not a physical RGB controller with
+// user-configurable component channels. SignalRGB should therefore create the
+// LED directly instead of inserting a Default Strip placeholder.
+const ledNames = ["Tuya Light"];
+const ledPositions = [[0, 0]];
+export function LedNames() { return ledNames; }
+export function LedPositions() { return ledPositions; }
 
 export function ControllableParameters() {
     return [
@@ -40,7 +44,7 @@ export function DiscoveryService() {
         service.log("[Tuya] Registering local bridge device");
         // New id forces SignalRGB to discard the stale pre-controller instance
         // that was persisted as "Default Strip - 0".
-        discovery.Discovered({ id: "tuya-local-bridge-v3", name: "Tuya Ceiling Light", bridgeHost: "127.0.0.1", bridgePort: 8766 });
+        discovery.Discovered({ id: "tuya-local-device-v4", name: "Tuya Ceiling Light", bridgeHost: "127.0.0.1", bridgePort: 8766 });
     };
     this.Update = function() {
         for (const controller of service.controllers) {
@@ -72,10 +76,8 @@ class TuyaBridge {
 
 export function Initialize() {
     device.setName(controller.name);
-    device.SetLedLimit(1);
-    device.addChannel("Tuya Light", 1);
     socket = udp.createSocket();
-    device.log("[Tuya] Initialized controller with 1 LED on local UDP bridge");
+    device.log("[Tuya] Initialized direct one-LED device on local UDP bridge");
 }
 
 export function Render() {
@@ -100,16 +102,9 @@ export function Shutdown() {
 }
 
 function averageCanvas() {
-    const colors = device.channel("Tuya Light").getColors("Inline");
-    if (!colors || colors.length < 3) return [0, 0, 0];
-    let r = 0, g = 0, b = 0;
-    for (let i = 0; i < colors.length; i += 3) {
-        r += colors[i] || 0;
-        g += colors[i + 1] || 0;
-        b += colors[i + 2] || 0;
-    }
-    const count = Math.max(1, Math.floor(colors.length / 3));
-    return [Math.round(r / count), Math.round(g / count), Math.round(b / count)];
+    const color = device.color(0, 0);
+    if (!color || color.length < 3) return [0, 0, 0];
+    return [color[0] || 0, color[1] || 0, color[2] || 0];
 }
 
 function hexToRgb(hex) {
