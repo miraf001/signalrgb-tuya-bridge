@@ -24,6 +24,7 @@ export function Size() { return [1, 1]; }
 export function SubdeviceController() { return true; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 1.0; }
+export function DefaultComponentBrand() { return "Tuya"; }
 
 export function ControllableParameters() {
     return [
@@ -37,14 +38,13 @@ export function DiscoveryService() {
     const discovery = this;
     this.Initialize = function() {
         service.log("[Tuya] Registering local bridge device");
-        discovery.Discovered({ id: "tuya-local-bridge", name: "Tuya Ceiling Light", bridgeHost: "127.0.0.1", bridgePort: 8766 });
+        // New id forces SignalRGB to discard the stale pre-controller instance
+        // that was persisted as "Default Strip - 0".
+        discovery.Discovered({ id: "tuya-local-bridge-v3", name: "Tuya Ceiling Light", bridgeHost: "127.0.0.1", bridgePort: 8766 });
     };
     this.Update = function() {
         for (const controller of service.controllers) {
-            if (!controller.obj.announced) {
-                controller.obj.announced = true;
-                service.announceController(controller.obj);
-            }
+            controller.obj.update();
         }
     };
     this.Discovered = function(value) {
@@ -58,7 +58,15 @@ class TuyaBridge {
         this.name = value.name;
         this.bridgeHost = value.bridgeHost;
         this.bridgePort = value.bridgePort;
-        this.announced = false;
+        this.initialized = false;
+    }
+
+    update() {
+        if (!this.initialized) {
+            this.initialized = true;
+            service.updateController(this);
+            service.announceController(this);
+        }
     }
 }
 
