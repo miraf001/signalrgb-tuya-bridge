@@ -8,6 +8,7 @@ var brightnessScale = "100";
 
 let frameCounter = 0;
 let lastRgb = [-1, -1, -1];
+let socket;
 const FRAME_SKIP = 15; // About 2 updates/sec at SignalRGB's 30 fps tick.
 const MIN_DELTA = 3;
 
@@ -15,7 +16,7 @@ export function Name() { return "Tuya Light Bridge"; }
 export function Publisher() { return "miraf001"; }
 export function Version() { return "0.1.0"; }
 export function Type() { return "network"; }
-export function SubdeviceController() { return true; }
+export function ImageUrl() { return "https://assets.signalrgb.com/brands/tuya/logo.png"; }
 export function Size() { return [1, 1]; }
 export function DefaultPosition() { return [0, 0]; }
 export function DefaultScale() { return 1.0; }
@@ -60,6 +61,7 @@ class TuyaBridge {
 export function Initialize() {
     device.setName(controller.name);
     device.addChannel("Tuya Light", 1);
+    socket = udp.createSocket();
     device.log("[Tuya] Initialized local UDP bridge");
 }
 
@@ -77,10 +79,12 @@ export function Render() {
     if (Math.max(Math.abs(rgb[0] - lastRgb[0]), Math.abs(rgb[1] - lastRgb[1]), Math.abs(rgb[2] - lastRgb[2])) < MIN_DELTA) return;
     lastRgb = rgb;
 
-    udp.write([0x54, 0x59, rgb[0], rgb[1], rgb[2]], controller.bridgeHost, controller.bridgePort);
+    socket.write([0x54, 0x59, rgb[0], rgb[1], rgb[2]], controller.bridgeHost, controller.bridgePort);
 }
 
-export function Shutdown() {}
+export function Shutdown() {
+    if (socket) socket.close();
+}
 
 function averageCanvas() {
     const colors = device.channel("Tuya Light").getColors("Inline");
