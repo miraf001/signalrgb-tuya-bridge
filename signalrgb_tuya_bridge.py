@@ -18,6 +18,7 @@ import tinytuya
 DEVICE_ID = os.environ.get("TUYA_DEVICE_ID", "bf892814e33b182ca5cbyl")
 CONFIG_FILE = Path(os.environ.get("TUYA_CONFIG_FILE", str(Path.home() / "tinytuya.json")))
 MODE_FILE = Path(os.environ.get("SIGNALRGB_MODE_FILE", str(Path(__file__).with_name("signalrgb_mode.json"))))
+PACKET_LOG = Path(os.environ.get("SIGNALRGB_PACKET_LOG", str(Path(__file__).with_name("signalrgb_packets.log"))))
 HOST = os.environ.get("SIGNALRGB_BRIDGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SIGNALRGB_BRIDGE_PORT", "8766"))
 UPDATE_SECONDS = float(os.environ.get("SIGNALRGB_TUYA_UPDATE_SECONDS", "0.5"))
@@ -26,6 +27,17 @@ cloud = tinytuya.Cloud(configFile=str(CONFIG_FILE))
 latest: tuple[int, int, int] | None = None
 latest_lock = threading.Lock()
 cloud_lock = threading.Lock()
+packet_log_lock = threading.Lock()
+
+
+def log_packet(rgb: tuple[int, int, int], address: tuple[str, int]) -> None:
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} RGB={rgb} FROM={address[0]}:{address[1]}\n"
+    try:
+        with packet_log_lock:
+            with PACKET_LOG.open("a", encoding="utf-8") as log_file:
+                log_file.write(line)
+    except OSError:
+        pass
 
 
 def rgb_to_hsv1000(rgb: tuple[int, int, int]) -> dict[str, int]:
@@ -99,11 +111,13 @@ def main() -> None:
     print(f"SignalRGB Tuya bridge listening on udp://{HOST}:{PORT}", flush=True)
     print(f"Device: {DEVICE_ID}; update interval: {UPDATE_SECONDS}s", flush=True)
     print(f"Mode file: {MODE_FILE}", flush=True)
+    print(f"Packet log: {PACKET_LOG}", flush=True)
     while True:
         packet, address = receiver.recvfrom(1024)
         if len(packet) >= 5 and packet[:2] == b"TY":
             with latest_lock:
                 latest = tuple(packet[2:5])  # type: ignore[assignment]
+            log_packet(latest, address)
             print(f"RGB {latest} from {address[0]}:{address[1]}", flush=True)
 
 
