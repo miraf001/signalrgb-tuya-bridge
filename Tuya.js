@@ -9,8 +9,8 @@ var brightnessScale = "100";
 let frameCounter = 0;
 let lastRgb = [-1, -1, -1];
 let socket;
-const FRAME_SKIP = 15; // About 2 updates/sec at SignalRGB's 30 fps tick.
-const MIN_DELTA = 3;
+const FRAME_SKIP = 3; // About 10 updates/sec at SignalRGB's 30 fps tick.
+const MIN_DELTA = 2;
 
 export function Name() { return "Tuya Light Bridge"; }
 export function Publisher() { return "miraf001"; }
