@@ -14,7 +14,7 @@ const MIN_DELTA = 3;
 
 export function Name() { return "Tuya Light Bridge"; }
 export function Publisher() { return "miraf001"; }
-export function Version() { return "0.1.0"; }
+export function Version() { return "0.2.0"; }
 export function Type() { return "network"; }
 export function ImageUrl() { return "https://assets.signalrgb.com/brands/tuya/logo.png"; }
 export function Size() { return [1, 1]; }
