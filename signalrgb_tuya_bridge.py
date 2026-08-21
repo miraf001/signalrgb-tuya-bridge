@@ -17,17 +17,34 @@ import tinytuya
 
 DEVICE_ID = os.environ.get("TUYA_DEVICE_ID", "bf892814e33b182ca5cbyl")
 CONFIG_FILE = Path(os.environ.get("TUYA_CONFIG_FILE", str(Path.home() / "tinytuya.json")))
+DEVICE_FILE = Path(os.environ.get("TUYA_DEVICE_FILE", str(Path(__file__).with_name("devices.json"))))
 MODE_FILE = Path(os.environ.get("SIGNALRGB_MODE_FILE", str(Path(__file__).with_name("signalrgb_mode.json"))))
 PACKET_LOG = Path(os.environ.get("SIGNALRGB_PACKET_LOG", str(Path(__file__).with_name("signalrgb_packets.log"))))
 HOST = os.environ.get("SIGNALRGB_BRIDGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SIGNALRGB_BRIDGE_PORT", "8766"))
-UPDATE_SECONDS = float(os.environ.get("SIGNALRGB_TUYA_UPDATE_SECONDS", "0.5"))
+UPDATE_SECONDS = float(os.environ.get("SIGNALRGB_TUYA_UPDATE_SECONDS", "0.1"))
+LOCAL_ENABLED = os.environ.get("SIGNALRGB_TUYA_LOCAL", "1") != "0"
 
 cloud = tinytuya.Cloud(configFile=str(CONFIG_FILE))
 latest: tuple[int, int, int] | None = None
 latest_lock = threading.Lock()
 cloud_lock = threading.Lock()
 packet_log_lock = threading.Lock()
+local_device = None
+
+
+def load_local_device():
+    if not LOCAL_ENABLED or not DEVICE_FILE.exists():
+        return None
+    try:
+        devices = json.loads(DEVICE_FILE.read_text(encoding="utf-8"))
+        entry = next(item for item in devices if item.get("id") == DEVICE_ID)
+        return tinytuya.Device(
+            entry["id"], entry["ip"], entry["key"], version=float(entry.get("version", 3.5))
+        )
+    except (OSError, ValueError, KeyError, StopIteration, TypeError) as exc:
+        print(f"Local Tuya setup unavailable: {exc}", flush=True)
+        return None
 
 
 def log_packet(rgb: tuple[int, int, int], address: tuple[str, int]) -> None:
@@ -64,6 +81,9 @@ def rgb_to_hsv1000(rgb: tuple[int, int, int]) -> dict[str, int]:
 
 def send_colour(rgb: tuple[int, int, int]) -> dict:
     colour = rgb_to_hsv1000(rgb)
+    if local_device is not None:
+        packed = f"{colour['h']:04x}{colour['s']:04x}{colour['v']:04x}"
+        return local_device.set_multiple_values({"21": "colour", "24": packed})
     commands = [
         {"code": "work_mode", "value": "colour"},
         {"code": "colour_data", "value": json.dumps(colour, separators=(",", ":"))},
@@ -104,12 +124,14 @@ def sender() -> None:
 
 
 def main() -> None:
-    global latest
+    global latest, local_device
+    local_device = load_local_device()
     receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     receiver.bind((HOST, PORT))
     threading.Thread(target=sender, daemon=True).start()
     print(f"SignalRGB Tuya bridge listening on udp://{HOST}:{PORT}", flush=True)
     print(f"Device: {DEVICE_ID}; update interval: {UPDATE_SECONDS}s", flush=True)
+    print(f"Transport: {'LAN' if local_device is not None else 'Cloud'}", flush=True)
     print(f"Mode file: {MODE_FILE}", flush=True)
     print(f"Packet log: {PACKET_LOG}", flush=True)
     while True:
