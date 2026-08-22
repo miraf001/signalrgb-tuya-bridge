@@ -7,10 +7,12 @@ var forcedColor = "0099ff";
 var brightnessScale = "100";
 
 let frameCounter = 0;
+let framesSinceSend = 0;
 let lastRgb = [-1, -1, -1];
 let socket;
 const FRAME_SKIP = 3; // About 10 updates/sec at SignalRGB's 30 fps tick.
 const MIN_DELTA = 2;
+const RESEND_FRAMES = 30; // Recover automatically if the bridge restarted.
 
 export function Name() { return "Tuya Light Bridge"; }
 export function Publisher() { return "miraf001"; }
@@ -84,6 +86,7 @@ export function Render() {
     frameCounter++;
     if (frameCounter < FRAME_SKIP) return;
     frameCounter = 0;
+    framesSinceSend++;
 
     let rgb;
     if (LightingMode === "Forced") rgb = hexToRgb(forcedColor);
@@ -91,8 +94,9 @@ export function Render() {
 
     const scale = Math.max(0, Math.min(100, parseInt(brightnessScale) || 100)) / 100;
     rgb = rgb.map((value) => Math.round(value * scale));
-    if (Math.max(Math.abs(rgb[0] - lastRgb[0]), Math.abs(rgb[1] - lastRgb[1]), Math.abs(rgb[2] - lastRgb[2])) < MIN_DELTA) return;
+    if (Math.max(Math.abs(rgb[0] - lastRgb[0]), Math.abs(rgb[1] - lastRgb[1]), Math.abs(rgb[2] - lastRgb[2])) < MIN_DELTA && framesSinceSend < RESEND_FRAMES) return;
     lastRgb = rgb;
+    framesSinceSend = 0;
 
     socket.write([0x54, 0x59, rgb[0], rgb[1], rgb[2]], controller.bridgeHost, controller.bridgePort);
 }
